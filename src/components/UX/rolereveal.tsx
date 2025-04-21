@@ -1,0 +1,1 @@
+// Reveals role to each player in the game

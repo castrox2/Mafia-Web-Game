@@ -1,0 +1,1 @@
+// Indicator as to who is who in the game

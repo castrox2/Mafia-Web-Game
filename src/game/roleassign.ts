@@ -1,0 +1,1 @@
+// Assigns random roles to players in a game

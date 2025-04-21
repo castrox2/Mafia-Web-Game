@@ -1,0 +1,1 @@
+// Used for Room code, PLayer ID, Player role, Current Phase, Game status
