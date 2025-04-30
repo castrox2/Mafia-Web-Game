@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import socket from "./sockets/client";
-import { generateRoomCode } from "./game/roomcodegen";
 
 export default function Home() {
   const [JoinCode, setJoinCode] = useState(""); // useState for join code
@@ -13,12 +12,25 @@ export default function Home() {
   // --- Listen for room creation confirmation --- //
   useEffect(() => {
     function onRoomCreated(code: string) {
-      router.push(`/game/${code}`); // redirect to new room's lobby
+      console.log("roomCreated received:", code); // log room code
+      setIsCreating(false); // reset creating flag
+      router.push(`/lobby/${code}`); // redirect to new room's lobby
     }
 
-    socket.on("roomCreated", onRoomCreated); // listen for room creation event
+    socket.on("connect", () => {
+      console.log("Socket connected:", socket.id); // log socket connection
+    });
+
+    socket.on("roomCreated", (code: string) => {
+      console.log("🔥 received roomCreated:", code);
+      alert("Room created! Redirecting...");
+      setIsCreating(false);
+      router.push(`/lobby/${code}`);
+    }); // listen for room creation event
+
     return () => {
       socket.off("roomCreated", onRoomCreated); // clean up listener
+      socket.off("connect"); // clean up connection listener
     };
   }, [router]);
 
@@ -30,9 +42,9 @@ export default function Home() {
 
   // --- Handler for "Create" --- //
   function handleCreate() {
-    setIsCreating(true); // Shows "ceating..." message
-    const newCode = generateRoomCode(); // generate a new room code
-    socket.emit("Create Room", newCode); // Ask server to create a room
+    setIsCreating(true); // Shows "creating..." message
+    console.log("Creating button clicked"); // log room creation
+    socket.emit("createRoom"); // Emit event to create room
   }
 
   return (

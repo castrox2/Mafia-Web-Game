@@ -1,7 +1,7 @@
 import type { NextApiRequest } from "next";
 import type { NextApiResponse } from "next";
 import type { Server as HTTPServer } from "http";
-import { initSocketServer } from "../../sockets/server";
+import { initSocketServer } from "@/app/sockets/server";
 
 // Extend NextApiResponse so TypeScript knows about `socket.server.io field
 type NextApiResponseWithIO = NextApiResponse & {

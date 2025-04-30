@@ -1,6 +1,7 @@
 // server set up + event handlers 
 import { Server } from "socket.io";
 import { Server as HTTPServer } from "http";
+import { nanoid } from "nanoid"; // ✅ Generates unique room codes
 
 let io: Server;
 
@@ -19,11 +20,15 @@ export function initSocketServer(httpServer: HTTPServer) {
         console.log("Client Connected:", socket.id);
 
         // --- Room Creation --- //
-        socket.on("createRoom", (roomCode: string) => {
+        socket.on("createRoom", () => { // no longer needs client to send roomCode
+            const roomCode = nanoid(6); // Generates a 6-character unique code
+
             if (!activeRooms.has(roomCode)) {
                 activeRooms.add(roomCode); // Marks the code as an active code
                 socket.join(roomCode); // put this socket in the room
-                socket.emit("Room Created", roomCode); // let room creator know
+                console.log("Room Created:", roomCode); // log new room
+                socket.emit("roomCreated", roomCode); // let room creator know (event renamed)
+                console.log("Room Created:", roomCode); // log new room
             } else {
                 socket.emit("ERROR:", "Room Already Exists!");
             }
