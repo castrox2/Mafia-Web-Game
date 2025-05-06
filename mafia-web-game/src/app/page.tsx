@@ -37,7 +37,7 @@ export default function Home() {
   // --- Handler for "Join" --- //
   function handleJoin() {
     if (!JoinCode) return; // no code entered
-    router.push(`/game/${JoinCode}`); // redirect to lobby
+    router.push(`/lobby/${JoinCode}`); // redirect to lobby
   }
 
   // --- Handler for "Create" --- //
