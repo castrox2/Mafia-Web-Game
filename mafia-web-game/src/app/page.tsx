@@ -5,68 +5,78 @@ import { useRouter } from "next/navigation";
 import socket from "./sockets/client";
 
 export default function Home() {
-  const [JoinCode, setJoinCode] = useState(""); // useState for join code
-  const [isCreating, setIsCreating] = useState(false); // flag while waiting for room to be created
+  const [JoinCode, setJoinCode] = useState(""); // Join code input
+  const [isCreating, setIsCreating] = useState(false); // Track create-room state
   const router = useRouter();
 
-  // --- Listen for room creation confirmation --- //
   useEffect(() => {
-    function onRoomCreated(code: string) {
-      console.log("roomCreated received:", code); // log room code
-      setIsCreating(false); // reset creating flag
-      router.push(`/lobby/${code}`); // redirect to new room's lobby
-    }
-
     socket.on("connect", () => {
-      console.log("Socket connected:", socket.id); // log socket connection
+      console.log("Socket connected:", socket.id);
     });
 
-    socket.on("roomCreated", (code: string) => {
-      console.log("🔥 received roomCreated:", code);
+    // Handle room creation success
+    const onRoomCreated = (code: string) => {
+      console.log("🔥 Room created:", code);
       alert("Room created! Redirecting...");
       setIsCreating(false);
       router.push(`/lobby/${code}`);
-    }); // listen for room creation event
+    };
+
+    socket.on("roomCreated", onRoomCreated);
 
     return () => {
-      socket.off("roomCreated", onRoomCreated); // clean up listener
-      socket.off("connect"); // clean up connection listener
+      socket.off("roomCreated", onRoomCreated);
+      socket.off("connect");
     };
   }, [router]);
 
-  // --- Handler for "Join" --- //
+  // --- Join Room --- //
   function handleJoin() {
-    if (!JoinCode) return; // no code entered
-    router.push(`/lobby/${JoinCode}`); // redirect to lobby
+    if (!JoinCode) return;
+
+    socket.emit("joinRoom", JoinCode); // Ask server to join room
+
+    // Success: only redirect if this socket successfully joined
+    const onJoinSuccess = (id: string) => {
+      if (id === socket.id) {
+        router.push(`/lobby/${JoinCode}`);
+      }
+    };
+
+    // Failure: show alert
+    const onJoinError = (msg: string) => {
+      alert(`Error: ${msg}`);
+    };
+
+    socket.once("playerJoined", onJoinSuccess);
+    socket.once("joinError", onJoinError);
   }
 
-  // --- Handler for "Create" --- //
+  // --- Create Room --- //
   function handleCreate() {
-    setIsCreating(true); // Shows "creating..." message
-    console.log("Creating button clicked"); // log room creation
-    socket.emit("createRoom"); // Emit event to create room
+    setIsCreating(true);
+    console.log("Creating new room...");
+    socket.emit("createRoom");
   }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      <h1 className="text-4xl font-bold font-style italic mb-8">Mafia 👹</h1>
+      <h1 className="text-4xl font-bold italic mb-8">Mafia 👹</h1>
 
-      {/* --- Join Form --- */}
+      {/* --- Join Section --- */}
       <div className="w-full max-w-sm mb-6">
-        <label className="block mb-2 text-sm font-medium">
-          Enter Room Code!
-        </label>
+        <label className="block mb-2 text-sm font-medium">Enter Room Code</label>
         <div className="flex">
           <input
             type="text"
             value={JoinCode}
             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-            placeholder="e.g A2B4C"
-            className="flex-grow border rounded-1 px-3 py-2 focus:outline-none"
+            placeholder="e.g. A2B4C"
+            className="flex-grow border rounded-l px-3 py-2 focus:outline-none"
           />
           <button
             onClick={handleJoin}
-            className="bg-blue-500 text-white rounded-r px-4 py-2 ml-2 hover:bg-blue-700"
+            className="bg-blue-500 text-white rounded-r px-4 py-2 hover:bg-blue-700"
           >
             Join
           </button>
@@ -75,7 +85,7 @@ export default function Home() {
 
       <div className="text-gray-500 mb-6">-- OR --</div>
 
-      {/* --- Create Form --- */}
+      {/* --- Create Section --- */}
       <button
         onClick={handleCreate}
         disabled={isCreating}

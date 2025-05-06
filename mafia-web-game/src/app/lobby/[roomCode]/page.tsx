@@ -1,50 +1,71 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import socket from "../../sockets/client";
 import PlayerAvatar from "@/app/components/UI/playeravatar";
 
 export default function LobbyPage() {
+  const router = useRouter();
   const params = useParams<{ roomCode: string }>();
-  const roomCode = params?.roomCode ?? "unknown"; // fallback in case undefined
+  const roomCode = params?.roomCode ?? "unknown"; // fallback if undefined
 
-  const [players, setPlayers] = useState<string[]>([]); // Tracks all players including self
-  const [selfId] = useState<string>("you"); // Static ID for now
-  const [showSettings, setShowSettings] = useState(false); // Settings modal visibility
+  const [players, setPlayers] = useState<string[]>([]); // Tracks all players
+  const [selfId, setSelfId] = useState<string>(""); // Holds actual socket.id
+  const [showSettings, setShowSettings] = useState(false); // Settings modal toggle
 
   useEffect(() => {
-    // Join room and add self to players
-    socket.emit("joinRoom", roomCode);
-    setPlayers(prev => Array.from(new Set([...prev, selfId])));
+    // Wait until socket is connected
+    const tryJoinRoom = () => {
+      const currentId = socket.id;
+      setSelfId(currentId); // Save self ID
+      setPlayers((prev) => Array.from(new Set([...prev, currentId]))); // Add self to list
+      socket.emit("joinRoom", roomCode); // Ask server to join
+    };
 
-    // Listener for players joining
+    if (socket.connected) {
+      tryJoinRoom();
+    } else {
+      socket.once("connect", tryJoinRoom); // Wait for connection if not ready
+    }
+
+    // When someone joins the room
     const onPlayerJoined = (id: string) => {
-      setPlayers(prev => Array.from(new Set([...prev, id])));
+      setPlayers((prev) => Array.from(new Set([...prev, id]))); // Add to lobby list
+    };
+
+    // If room doesn't exist
+    const onJoinError = (msg: string) => {
+      alert(msg);
+      router.push("/"); // Go back to home
     };
 
     socket.on("playerJoined", onPlayerJoined);
+    socket.on("joinError", onJoinError);
+
     return () => {
       socket.off("playerJoined", onPlayerJoined);
+      socket.off("joinError", onJoinError);
+      socket.off("connect", tryJoinRoom);
     };
-  }, [roomCode, selfId]);
+  }, [roomCode, router]);
 
-  // Adds a fake bot to the player list
+  // Adds a fake bot for testing
   const handleAddBot = () => {
     const botId = "bot-" + Math.random().toString(36).substring(2, 6).toUpperCase();
-    setPlayers(prev => Array.from(new Set([...prev, botId])));
+    setPlayers((prev) => Array.from(new Set([...prev, botId])));
   };
 
   return (
     <div className="flex h-screen bg-zinc-900 text-white">
-      {/* --- Panel 1: Static Personal Info --- */}
+      {/* --- Panel 1: Personal Info --- */}
       <div className="w-1/4 min-w-[200px] border-r border-zinc-700 flex flex-col justify-between p-4 bg-zinc-800/70 backdrop-blur-sm">
         <div>
           <div className="flex items-center gap-4 mb-4">
             <PlayerAvatar id={selfId} />
             <div className="overflow-hidden">
               <p className="font-semibold truncate">UsernamePlaceholder</p>
-              <p className="text-sm text-zinc-400 truncate">ID: {selfId}</p>
+              <p className="text-sm text-zinc-400 truncate">ID: {selfId || "Loading..."}</p>
             </div>
           </div>
         </div>
@@ -65,14 +86,13 @@ export default function LobbyPage() {
         </div>
       </div>
 
-      {/* --- Panel 2: Lobby List & Actions --- */}
+      {/* --- Panel 2: Player List --- */}
       <div className="flex-1 p-6 overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">Lobby</h1>
+          <h1 className="text-2xl font-bold">Lobby Code:</h1>
           <div className="text-sm text-zinc-400">Players: {players.length}</div>
         </div>
 
-        {/* Players List */}
         <ul className="space-y-3 max-w-lg">
           {players.map((id) => (
             <li
@@ -88,7 +108,6 @@ export default function LobbyPage() {
           ))}
         </ul>
 
-        {/* Add Bot Button */}
         <button
           onClick={handleAddBot}
           className="mt-6 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded"

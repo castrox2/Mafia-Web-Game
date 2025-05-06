@@ -1,66 +1,83 @@
-// server set up + event handlers 
+// server.ts – Socket.IO + MongoDB Room Management
+
+import dotenv from "dotenv";
+import path from "path";
+dotenv.config({ path: path.resolve(process.cwd(), ".env.local") }); // ✅ Ensure path is correct
+
 import { Server } from "socket.io";
 import { Server as HTTPServer } from "http";
-import { nanoid } from "nanoid"; // ✅ Generates unique room codes
+import { nanoid } from "nanoid";
+import mongoose from "mongoose";
+import Room from "@/db/models/room";
+
+// --- MongoDB Setup --- //
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) throw new Error("❌ Missing MONGODB_URI in environment");
+
+async function connectDB() {
+  if (mongoose.connection.readyState === 0) {
+    await mongoose.connect(MONGODB_URI!);
+    console.log("✅ MongoDB connected");
+  }
+}
 
 let io: Server;
 
 export function initSocketServer(httpServer: HTTPServer) {
-    if (io) return io; // Only initialize once
-    io = new Server(httpServer, { // Create Server, attach to http server
-        path: "/api/socket", // must match API route
-        cors: { origin: "*" }, // allow all origins (dev only)
+  if (io) return io;
+
+  io = new Server(httpServer, {
+    path: "/api/socket",
+    cors: { origin: "*" },
+  });
+
+  io.on("connection", (socket) => {
+    console.log("Client connected:", socket.id);
+
+    // --- Create Room --- //
+    socket.on("createRoom", async () => {
+      await connectDB();
+      const roomCode = nanoid(6).toUpperCase();
+
+      const existingRoom = await Room.findOne({ code: roomCode });
+      if (existingRoom) {
+        socket.emit("roomError", "Room already exists.");
+        return;
+      }
+
+      const room = new Room({ code: roomCode });
+      await room.save();
+      socket.join(roomCode);
+      socket.emit("roomCreated", roomCode);
+      console.log("Room Created:", roomCode);
     });
 
-    // In-memory store for active rooms and their code
-    const activeRooms = new Set<string>();
+    // --- Join Room --- //
+    socket.on("joinRoom", async (roomCode: string) => {
+      await connectDB();
+      const room = await Room.findOne({ code: roomCode });
 
-    // Listens for incoming connections 
-    io.on("connection", (socket) => {
-        console.log("Client Connected:", socket.id);
+      if (!room) {
+        socket.emit("joinError", "Room does not exist.");
+        return;
+      }
 
-        // --- Room Creation --- //
-        socket.on("createRoom", () => { // no longer needs client to send roomCode
-            const roomCode = nanoid(6); // Generates a 6-character unique code
-
-            if (!activeRooms.has(roomCode)) {
-                activeRooms.add(roomCode); // Marks the code as an active code
-                socket.join(roomCode); // put this socket in the room
-                console.log("Room Created:", roomCode); // log new room
-                socket.emit("roomCreated", roomCode); // let room creator know (event renamed)
-                console.log("Room Created:", roomCode); // log new room
-            } else {
-                socket.emit("ERROR:", "Room Already Exists!");
-            }
-        });
-
-        // --- Join Existing Room --- //
-        socket.on("Join Room", (roomCode: string) => {
-            if (activeRooms.has(roomCode)) { // Checks if room exists
-                socket.join(roomCode); // Adds this socket to that room || Goes ahead if room exists
-                io.to(roomCode).emit("Player Joined!", socket.id); // Notifies Players when someone joins
-            } else {
-                socket.emit("ERROR:", "Room Not Found!");
-            }
-        });
-
-        // --- Leave Room --- //
-        socket.on("Leave Room", (roomCode: string) => {
-            if (activeRooms.has(roomCode)) { // Checks if the room exists
-                socket.leave(roomCode); // Removes socket from the room || Goes ahead if room exists
-                io.to(roomCode).emit("Player Left!", socket.id); // Notifies Players when someone leaves
-                
-                // --- Room Delete --- // 
-                const room = io.sockets.adapter.rooms.get(roomCode);
-                if (!room || room.size === 0) { // Check room size / does a player count
-                    activeRooms.delete(roomCode); // Deletes room if room is empty / if player count = 0
-                    console.log(`Room ${roomCode} deleted (Now an Empty Room)`); // Just saying that the room is empty and has been deleted
-                }
-            } else {
-                socket.emit("ERROR:", "Room Not Found!");
-            }
-        });
+      socket.join(roomCode);
+      io.to(roomCode).emit("playerJoined", socket.id);
     });
 
-    return io;
+    // --- Leave Room --- //
+    socket.on("Leave Room", async (roomCode: string) => {
+      socket.leave(roomCode);
+      io.to(roomCode).emit("Player Left!", socket.id);
+
+      const room = io.sockets.adapter.rooms.get(roomCode);
+      if (!room || room.size === 0) {
+        await Room.deleteOne({ code: roomCode });
+        console.log(`Room ${roomCode} deleted`);
+      }
+    });
+  });
+
+  return io;
 }
