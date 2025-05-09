@@ -3,16 +3,31 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import socket from "./sockets/client";
+import UsernamePrompt from "./components/UI/modal";
 
 export default function Home() {
   const [JoinCode, setJoinCode] = useState(""); // Join code input
   const [isCreating, setIsCreating] = useState(false); // Track create-room state
+  const [username, setUsername] = useState(""); // Username input 
+  const [showPrompt, setShowPrompt] = useState(false); // Show username prompt
   const router = useRouter();
+
+  // --- Username Prompt --- //
+  useEffect(() => {
+    const stored = sessionStorage.getItem("guest_username");
+    if (stored) {
+      setUsername(stored);
+    } else {
+      setShowPrompt(true);
+    }
+  }, []);
 
   useEffect(() => {
     socket.on("connect", () => {
       console.log("Socket connected:", socket.id);
     });
+
+      // ============================================================= //
 
     // Handle room creation success
     const onRoomCreated = (code: string) => {
@@ -32,9 +47,9 @@ export default function Home() {
 
   // --- Join Room --- //
   function handleJoin() {
-    if (!JoinCode) return;
+    if (!JoinCode || !username) return;
 
-    socket.emit("joinRoom", JoinCode); // Ask server to join room
+    socket.emit("joinRoom", {roomCode: JoinCode, username}); // Ask server to join room
 
     // Success: only redirect if this socket successfully joined
     const onJoinSuccess = (id: string) => {
@@ -55,13 +70,30 @@ export default function Home() {
   // --- Create Room --- //
   function handleCreate() {
     setIsCreating(true);
-    console.log("Creating new room...");
+    const username = sessionStorage.getItem("mafia-username") || `Guest-${Math.floor(Math.random() * 10000)}`;
     socket.emit("createRoom");
+  
+    socket.once("roomCreated", (code: string) => {
+      socket.emit("joinRoom", code, username); // ⬅ send username here
+      setIsCreating(false);
+      router.push(`/lobby/${code}`);
+    });
   }
+  
+  function handleUsernameSubmit(finalUsername: string) {
+    setUsername(finalUsername); // Set it in state
+    sessionStorage.setItem("guest_username", finalUsername); // Save to session
+    setShowPrompt(false); // Close the modal
+  }
+
+  // ============================================================= //
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4">
       <h1 className="text-4xl font-bold italic mb-8">Mafia 👹</h1>
+
+      {/* --- Username Modal --- */}
+      {showPrompt && <UsernamePrompt onSubmit={handleUsernameSubmit} />}
 
       {/* --- Join Section --- */}
       <div className="w-full max-w-sm mb-6">
