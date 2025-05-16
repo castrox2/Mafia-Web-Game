@@ -9,7 +9,7 @@ class GameEngine {
     private votes: Record <string, string> = {};
     private voteTieCandidates: string[] | null = null;
 
-
+    // Stores detective choice and result
     private detectiveTargetId: string | null = null;
     private detectiveResult: string | null = null;
     
@@ -137,7 +137,7 @@ class GameEngine {
     }
 
     // Handles votes
-    submitVote(voterId: string, targetId: string): void {
+    submitVote(voterId: string, targetId: string): { voteComplete: boolean; tie: boolean; tieCandidates?: string[] } {
         // Gather votes from targetID, using voterID as key
         this.votes[voterId] = targetId;
 
@@ -173,7 +173,9 @@ class GameEngine {
             if (topVotedPlayers.length > 1) {
                 this.voteTieCandidates = topVotedPlayers;
                 this.votes = {};
-                return;
+
+                // Returns signal when all players are voted, in this case it is a tie
+                return { voteComplete: true, tie: true, tieCandidates: this.voteTieCandidates };
             }
 
             // Finds voted out player
@@ -191,6 +193,9 @@ class GameEngine {
             // Clears for future use
             this.votes = {};
             this.voteTieCandidates = null;
+
+            // Returns signal when all players are voted, no tie
+            return { voteComplete: true, tie: false};
         }
     }
 
