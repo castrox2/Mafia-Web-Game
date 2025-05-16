@@ -1,1 +1,0 @@
-// game actions (kill, save, investigate)
