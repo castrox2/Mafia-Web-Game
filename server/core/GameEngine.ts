@@ -1,5 +1,4 @@
-type Player = {id: string; role: string; alive: boolean};
-type Phase = 'waiting' | 'day' | 'night' | 'ended';
+import { Player, Phase, Role, VoteResult } from '../types/types';
 
 class GameEngine {
     private players: Player[] = [];
@@ -137,7 +136,7 @@ class GameEngine {
     }
 
     // Handles votes
-    submitVote(voterId: string, targetId: string): { voteComplete: boolean; tie: boolean; tieCandidates?: string[] } {
+    submitVote(voterId: string, targetId: string): VoteResult {
         // Gather votes from targetID, using voterID as key
         this.votes[voterId] = targetId;
 
@@ -228,6 +227,11 @@ class GameEngine {
     // Get winner (testing)
     getWinner(): string | null {
         return this.winner;
+    }
+
+    // Get detective result
+    getDetectiveResult(): string | null {
+        return this.detectiveResult;
     }
 }
 

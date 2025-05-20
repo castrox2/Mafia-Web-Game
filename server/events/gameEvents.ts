@@ -1,6 +1,13 @@
 import { Server, Socket } from 'socket.io';
-import { GameStore } from './GameStore';
-import { GameEngine } from './GameEngine';
+import { GameStore } from '.GameStore';
+import { GameEngine } from '../core/GameEngine';
+import {
+    PlayerVotePayload,
+    MafiaVotePayload,
+    DetectiveActionPayload,
+    NextPhasePayload,
+    GameStatePublic,
+  } from '../types/types';
 
 export function registerGameEvents(io: Server, gameStore: GameStore) {
     // On connection, sets up new listener on new player connection to Socket.IO server
@@ -9,14 +16,14 @@ export function registerGameEvents(io: Server, gameStore: GameStore) {
         console.log(`Player connected: ${socket.id}`);
 
         // Sets up listener for custom event called "playerVote"
-        socket.on('playerVote', ({ gameId, voterId, targetId}) => {
+        socket.on('playerVote', ({ gameId, voterId, targetId }: PlayerVotePayload) => {
 
             // Calls your gameStore to retrieve in-memory GameEngine instance that matches given gameId
             const game = gameStore.getGame(gameId);
 
             // Logs error if no game found
             if (!game) {
-                console.error('Game not found with ID: ${gameId}');
+                console.error(`Game not found with ID: ${gameId}`);
                 socket.emit ('error', { message: 'Game not found.'});
                 return;
             }
@@ -49,14 +56,14 @@ export function registerGameEvents(io: Server, gameStore: GameStore) {
         });
 
         // Sets up listener for custom event called "nextPhase"
-        socket.on('nextPhase', ({ gameId }) => {
+        socket.on('nextPhase', ({ gameId }: NextPhasePayload) => {
 
             // Calls your gameStore to retrieve in-memory GameEngine instance that matches given gameId
             const game = gameStore.getGame(gameId);
 
             // Logs error if no game found
             if (!game) {
-                console.error('Game not found with ID: ${gameId}');
+                console.error(`Game not found with ID: ${gameId}`);
                 socket.emit ('error', { message: 'Game not found.'});
                 return;
             }
@@ -80,13 +87,13 @@ export function registerGameEvents(io: Server, gameStore: GameStore) {
         });
 
         // Sets up listener for custom event called "submitMafiaVote"
-        socket.on('submitMafiaVote', ({ gameId, voterId, targetId }) => {
+        socket.on('submitMafiaVote', ({ gameId, voterId, targetId }: MafiaVotePayload) => {
             // Calls your gameStore to retrieve in-memory GameEngine instance that matches given gameId
             const game = gameStore.getGame(gameId);
 
             // Logs error if no game found
             if (!game) {
-                console.error('Game not found with ID: ${gameId}');
+                console.error(`Game not found with ID: ${gameId}`);
                 socket.emit ('error', { message: 'Game not found.'});
                 return;
             }
@@ -106,13 +113,14 @@ export function registerGameEvents(io: Server, gameStore: GameStore) {
         });
 
         // Sets up listener for custom event called "detectiveAction"
-        socket.on('detectiveAction', ({ gameId, playerId, targetId }) => {
+        // Socket for basically grabbing and storing the detective target chosen
+        socket.on('detectiveAction', ({ gameId, playerId, targetId }: DetectiveActionPayload) => {
             // Calls your gameStore to retrieve in-memory GameEngine instance that matches given gameId
             const game = gameStore.getGame(gameId);
 
             // Logs error if no game found
             if (!game) {
-                console.error('Game not found with ID: ${gameId}');
+                console.error(`Game not found with ID: ${gameId}`);
                 socket.emit ('error', { message: 'Game not found.'});
                 return;
             }
@@ -130,5 +138,50 @@ export function registerGameEvents(io: Server, gameStore: GameStore) {
                 socket.emit('error', { message: 'Failed to process detective action.' });
               }
         });
+
+        // Sets up listener for custom event called "getDetectiveResult"
+        // Actually finds player's role and shows to detective
+        socket.on('getDetectiveResult', ({ gameId, playerId }) => {
+            // Calls your gameStore to retrieve in-memory GameEngine instance that matches given gameId
+            const game = gameStore.getGame(gameId);
+
+            // Logs error if no game found
+            if (!game) {
+                console.error(`Game not found with ID: ${gameId}`);
+                socket.emit ('error', { message: 'Game not found.'});
+                return;
+            }
+          
+            // Optional: verify playerId is the detective before sending
+            if (socket.id !== playerId) return; // Add better role validation later
+          
+            const result = game.getDetectiveResult(); // You may need to expose a getter
+            if (result) {
+              socket.emit('detectiveResult', { role: result });
+            }
+          });
+          
+
+        // Sets up listener for custom event called "requestGameState"
+        // For future scalability when attempting to join a game late, rejoin, or when user refreshes screen
+        socket.on('requestGameState', ({ gameId }: NextPhasePayload) => {
+            // Calls your gameStore to retrieve in-memory GameEngine instance that matches given gameId
+            const game = gameStore.getGame(gameId);
+
+            // Logs error if no game found
+            if (!game) {
+                console.error(`Game not found with ID: ${gameId}`);
+                socket.emit ('error', { message: 'Game not found.'});
+                return;
+            }
+          
+            const state = game.getPublicState();
+            socket.emit('gameState', state); // Emit only to the requesting player
+          });
+
+         // Logs in console when player disconnects
+        socket.on('disconnect', () => {
+        console.log(`[disconnect] Player disconnected: ${socket.id}`);
+        });
     }
-}
+};
