@@ -3,7 +3,7 @@ import { GameStore } from './GameStore';
 import { GameEngine } from './GameEngine';
 
 export function registerGameEvents(io: Server, gameStore: GameStore) {
-    // On connection, make a new socket for the user
+    // On connection, make a new socket for all user  - each individual player opens a new socket
     io.on('connection', (socket: Socket) => {
         console.log(`Player connected: ${socket.id}`);
 
@@ -29,4 +29,5 @@ export function registerGameEvents(io: Server, gameStore: GameStore) {
             const publicState = game.getPublicState();
             io.to(gameId).emit('voteUpdate', publicState);
         } 
-}
+
+    }

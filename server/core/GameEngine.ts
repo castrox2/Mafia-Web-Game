@@ -1,3 +1,6 @@
+//GameEngine: class and all main methods
+
+
 type Player = {id: string; role: string; alive: boolean};
 type Phase = 'waiting' | 'day' | 'night' | 'ended';
 
@@ -28,17 +31,21 @@ class GameEngine {
         this.assignRoles();
         this.phase = 'night';
     }
+/*x amount of players - create an array based off the number of players: str
 
+*/
+//random role assignment
     assignRoles() {
+        //amount of players  - 1 detective, villagers and mafia
         const playerCount = this.players.length;
         const mafiaCount = Math.floor(playerCount/4)
         // Counts how many villagers there will be, for now only including detective
-        const villagerCount = playerCount - mafiaCount - 1;
+        const villagerCount = playerCount - mafiaCount - 1;//subtract 1 from the player count for the detective
         const availableRoles = [
             // Create a flattened role list: [mafia, mafia, ..., villager, ..., detective]
             // The spread operator (...) flattens the filled arrays into a single array
-            ...Array(mafiaCount).fill("mafia"),
-            ...Array(villagerCount).fill("villager"),
+            ...Array(mafiaCount).fill("mafia"), //count how many mafia 
+            ...Array(villagerCount).fill("villager"),//fill the remaining roles with 'villager' based off of the number of mafias 
             "detective"
         ];
 
@@ -68,13 +75,14 @@ class GameEngine {
         }
 
         // Mafia role
+        // NEED TO RUN submitMafiaVote() IN BELOW
         if (this.mafiaTargetId) {
             // Find mafia target
             const targetPlayer = this.players.find (
                 player => player.id === this.mafiaTargetId
             );
 
-            // Update target alive status
+            // Update target alive status - if the mafia votes on them + run 
             if (targetPlayer) {
                 targetPlayer.alive = false;
             }
@@ -82,7 +90,7 @@ class GameEngine {
             this.mafiaTargetId = null;
         }
     }
-
+//submit vote should only run for mafia with status [alive]
     submitMafiaVote(voterId: string, targetId: string) : void {
         // Record vote
         this.mafiaVotes[voterId] = targetId;
@@ -93,18 +101,21 @@ class GameEngine {
         );
 
         // Check if all mafia voted and if unanimous
+           //create list of votes from the mafia amd compare the items - check if ===
         const allVoted = aliveMafia.every(player => this.mafiaVotes[player.id]);
         // Creates array with only values, ignoring keys
         const voteTargets = Object.values(this.mafiaVotes);
         const unanimous = voteTargets.every(id => id === voteTargets[0]);
 
-        // If all 
+        //create list of votes from the mafia amd compare the items - check if ===
+        //check if all [alive] mafia has voted
         if (allVoted && unanimous) {
             this.mafiaTargetId = voteTargets[0];
             this.mafiaVotes = {}; 
         }
     }
-
+//changes phase between night and day
+//calls performRoleActions and checkWinCondition
     nextPhase() {
         if (this.phase === "night") {
             // Mafia/Detective actions
@@ -226,7 +237,9 @@ class GameEngine {
     }
 }
 
-// Fisher-Yates shuffle 
+// Fisher-Yates shuffle - swapping around - gets random index by going to the first index, 
+// then generate random number based off of how many total numbers there are, 
+// then swap it with that random index, and repeat for number of items in array
 function shuffleArray<T>(array: T[]): void {
     for (let i = array.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1)); // Random index from 0 to i+1
